@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HEAVY VOLUME SHADER BM</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Orbitron', monospace;
+            background: linear-gradient(45deg, #0a0a0a, #1a1a1a, #2a0a0a);
+            color: #ff4444;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .scanlines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(255, 0, 0, 0.03) 2px,
+                rgba(255, 0, 0, 0.03) 4px
+            );
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        .main-container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .header {
+            background: linear-gradient(90deg, #330000, #660000, #330000);
+            padding: 20px;
+            text-align: center;
+            border-bottom: 3px solid #ff4444;
+            box-shadow: 0 0 20px rgba(255, 68, 68, 0.5);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+            animation: sweep 3s infinite;
+        }
+
+        @keyframes sweep {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+
+        .title {
+            font-size: 2.5rem;
+            font-weight: 900;
+            text-shadow: 0 0 20px #ff4444;
+            letter-spacing: 0.2em;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .canvas-container {
+            flex: 1;
+            position: relative;
+            background: radial-gradient(circle at center, #1a0a0a, #000000);
+            border: 2px solid #ff4444;
+            margin: 20px;
+            box-shadow: 
+                inset 0 0 50px rgba(255, 68, 68, 0.3),
+                0 0 50px rgba(255, 68, 68, 0.5);
+        }
+
+        #shaderCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            filter: contrast(1.5) brightness(1.2);
+        }
+
+        .controls {
+            background: linear-gradient(180deg, #2a0a0a, #1a0a0a);
+            padding: 30px;
+            border-top: 3px solid #ff4444;
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            flex-wrap: wrap;
+            box-shadow: 0 -10px 30px rgba(255, 68, 68, 0.3);
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            min-width: 200px;
+        }
+
+        .control-label {
+            font-size: 1.2rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            text-shadow: 0 0 10px #ff4444;
+        }
+
+        .heavy-button {
+            background: linear-gradient(45deg, #330000, #660000, #990000);
+            color: #ffffff;
+            border: 2px solid #ff4444;
+            padding: 15px 30px;
+            font-family: 'Orbitron', monospace;
+            font-weight: 700;
+            font-size: 1.1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(255, 68, 68, 0.5);
+        }
+
+        .heavy-button:hover {
+            background: linear-gradient(45deg, #660000, #990000, #cc0000);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 25px rgba(255, 68, 68, 0.8);
+        }
+
+        .heavy-button::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            transition: all 0.3s ease;
+            transform: translate(-50%, -50%);
+        }
+
+        .heavy-button:active::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        .slider-container {
+            position: relative;
+            width: 200px;
+            height: 40px;
+            background: linear-gradient(90deg, #1a0a0a, #330000);
+            border: 2px solid #ff4444;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8);
+        }
+
+        .heavy-slider {
+            width: 100%;
+            height: 100%;
+            background: transparent;
+            border: none;
+            outline: none;
+            cursor: pointer;
+            position: relative;
+            z-index: 2;
+        }
+
+        .heavy-slider::-webkit-slider-thumb {
+            appearance: none;
+            width: 30px;
+            height: 30px;
+            background: radial-gradient(circle, #ff4444, #990000);
+            border: 2px solid #ffffff;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 15px rgba(255, 68, 68, 0.8);
+            transition: all 0.2s ease;
+        }
+
+        .heavy-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            box-shadow: 0 0 25px rgba(255, 68, 68, 1);
+        }
+
+        .slider-track {
+            position: absolute;
+            top: 50%;
+            left: 10px;
+            right: 10px;
+            height: 4px;
+            background: linear-gradient(90deg, #ff4444, #990000, #ff4444);
+            transform: translateY(-50%);
+            border-radius: 2px;
+            box-shadow: 0 0 10px rgba(255, 68, 68, 0.5);
+        }
+
+        .warning-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1.5rem;
+            font-weight: 700;
+            text-align: center;
+            color: #ff4444;
+            text-shadow: 0 0 20px #ff4444;
+            z-index: 10;
+            animation: warning-blink 1s infinite;
+        }
+
+        @keyframes warning-blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.3; }
+        }
+
+        .particle-system {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .particle {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background: #ff4444;
+            border-radius: 50%;
+            animation: particle-float 4s infinite linear;
+        }
+
+        @keyframes particle-float {
+            0% {
+                transform: translateY(100vh) translateX(0);
+                opacity: 0;
+            }
+            10% {
+                opacity: 1;
+            }
+            90% {
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(-10vh) translateX(100px);
+                opacity: 0;
+            }
+        }
+
+        .glitch-effect {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            background: repeating-linear-gradient(
+                90deg,
+                transparent,
+                transparent 100px,
+                rgba(255, 0, 0, 0.05) 100px,
+                rgba(255, 0, 0, 0.05) 101px
+            );
+            animation: glitch 0.3s infinite;
+        }
+
+        @keyframes glitch {
+            0% { transform: translateX(0); }
+            20% { transform: translateX(-2px); }
+            40% { transform: translateX(2px); }
+            60% { transform: translateX(-1px); }
+            80% { transform: translateX(1px); }
+            100% { transform: translateX(0); }
+        }
+    </style>
+</head>
+<body>
+    <div class="scanlines"></div>
+    <div class="glitch-effect"></div>
+    
+    <div class="main-container">
+        <div class="header">
+            <h1 class="title">HEAVY VOLUME SHADER BM</h1>
+        </div>
+        
+        <div class="canvas-container">
+            <canvas id="shaderCanvas"></canvas>
+            <div class="warning-text">CANVAS NOT SUPPORTED - HEAVY MODE ENGAGED</div>
+            <div class="particle-system" id="particleSystem"></div>
+        </div>
+        
+        <div class="controls">
+            <div class="control-group">
+                <div class="control-label">Intensity</div>
+                <div class="slider-container">
+                    <div class="slider-track"></div>
+                    <input type="range" class="heavy-slider" min="0" max="100" value="75" id="intensitySlider">
+                </div>
+            </div>
+            
+            <div class="control-group">
+                <div class="control-label">Frequency</div>
+                <div class="slider-container">
+                    <div class="slider-track"></div>
+                    <input type="range" class="heavy-slider" min="0" max="100" value="50" id="frequencySlider">
+                </div>
+            </div>
+            
+            <div class="control-group">
+                <div class="control-label">Distortion</div>
+                <div class="slider-container">
+                    <div class="slider-track"></div>
+                    <input type="range" class="heavy-slider" min="0" max="100" value="85" id="distortionSlider">
+                </div>
+            </div>
+            
+            <div class="control-group">
+                <div class="control-label">Actions</div>
+                <div style="display: flex; gap: 15px;">
+                    <button class="heavy-button" onclick="applyConfig()">APPLY</button>
+                    <button class="heavy-button" onclick="resetConfig()">RESET</button>
+                    <button class="heavy-button" onclick="cancelConfig()">CANCEL</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize heavy effects
+        let animationId;
+        let particles = [];
+        
+        function createParticles() {
+            const particleSystem = document.getElementById('particleSystem');
+            
+            setInterval(() => {
+                if (particles.length < 50) {
+                    const particle = document.createElement('div');
+                    particle.className = 'particle';
+                    particle.style.left = Math.random() * 100 + '%';
+                    particle.style.animationDelay = Math.random() * 2 + 's';
+                    particle.style.animationDuration = (Math.random() * 3 + 2) + 's';
+                    particleSystem.appendChild(particle);
+                    particles.push(particle);
+                    
+                    setTimeout(() => {
+                        if (particle.parentNode) {
+                            particle.parentNode.removeChild(particle);
+                            particles = particles.filter(p => p !== particle);
+                        }
+                    }, 6000);
+                }
+            }, 200);
+        }
+        
+        function initializeHeavyCanvas() {
+            const canvas = document.getElementById('shaderCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            if (!ctx) {
+                console.log('Canvas not supported - Heavy mode engaged');
+                return;
+            }
+            
+            canvas.width = canvas.clientWidth;
+            canvas.height = canvas.clientHeight;
+            
+            function drawHeavyEffect() {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Heavy visual effects
+                const time = Date.now() * 0.001;
+                const intensity = document.getElementById('intensitySlider').value / 100;
+                const frequency = document.getElementById('frequencySlider').value / 100;
+                const distortion = document.getElementById('distortionSlider').value / 100;
+                
+                for (let i = 0; i < 200; i++) {
+                    const x = Math.sin(time * frequency * 2 + i * 0.1) * canvas.width * 0.3 + canvas.width * 0.5;
+                    const y = Math.cos(time * frequency * 1.5 + i * 0.15) * canvas.height * 0.3 + canvas.height * 0.5;
+                    
+                    const size = Math.sin(time * 3 + i * 0.2) * 20 * intensity + 25;
+                    const alpha = Math.sin(time * 2 + i * 0.1) * 0.5 + 0.5;
+                    
+                    ctx.fillStyle = `rgba(255, ${68 + Math.sin(time + i) * 50}, ${68 + Math.cos(time + i) * 50}, ${alpha * intensity})`;
+                    ctx.beginPath();
+                    ctx.arc(x + Math.sin(time * 5 + i) * distortion * 50, y + Math.cos(time * 4 + i) * distortion * 50, size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                // Heavy scan lines
+                ctx.strokeStyle = `rgba(255, 68, 68, ${intensity * 0.3})`;
+                ctx.lineWidth = 2;
+                for (let i = 0; i < canvas.height; i += 20) {
+                    ctx.beginPath();
+                    ctx.moveTo(0, i + Math.sin(time * 2 + i * 0.01) * 5);
+                    ctx.lineTo(canvas.width, i + Math.sin(time * 2 + i * 0.01) * 5);
+                    ctx.stroke();
+                }
+                
+                animationId = requestAnimationFrame(drawHeavyEffect);
+            }
+            
+            drawHeavyEffect();
+        }
+        
+        function applyConfig() {
+            console.log('HEAVY CONFIG APPLIED');
+            // Add screen flash effect
+            document.body.style.background = '#ff4444';
+            setTimeout(() => {
+                document.body.style.background = 'linear-gradient(45deg, #0a0a0a, #1a1a1a, #2a0a0a)';
+            }, 100);
+        }
+        
+        function resetConfig() {
+            console.log('HEAVY CONFIG RESET');
+            document.getElementById('intensitySlider').value = 75;
+            document.getElementById('frequencySlider').value = 50;
+            document.getElementById('distortionSlider').value = 85;
+        }
+        
+        function cancelConfig() {
+            console.log('HEAVY CONFIG CANCELLED');
+            // Add warning flash
+            const warning = document.querySelector('.warning-text');
+            warning.style.fontSize = '2rem';
+            warning.textContent = 'OPERATION CANCELLED - HEAVY MODE ACTIVE';
+            setTimeout(() => {
+                warning.style.fontSize = '1.5rem';
+                warning.textContent = 'CANVAS NOT SUPPORTED - HEAVY MODE ENGAGED';
+            }, 2000);
+        }
+        
+        // Initialize everything
+        window.addEventListener('load', () => {
+            createParticles();
+            initializeHeavyCanvas();
+        });
+        
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            const canvas = document.getElementById('shaderCanvas');
+            canvas.width = canvas.clientWidth;
+            canvas.height = canvas.clientHeight;
+        });
+        
+        // Add keyboard controls for extra heaviness
+        document.addEventListener('keydown', (e) => {
+            if (e.key === ' ') {
+                e.preventDefault();
+                applyConfig();
+            }
+        });
+    </script>
+</body>
+</html>
